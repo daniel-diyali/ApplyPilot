@@ -14,10 +14,14 @@ app = FastAPI(title="ApplyPilot API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # restrict in prod
+    allow_origins=[
+        "http://localhost:3000",  # React dev server
+        "http://localhost:8080",  # Alternative dev port
+        "https://applypilot.com", # Production domain
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
