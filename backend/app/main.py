@@ -1,7 +1,14 @@
 # backend/app/main.py
 from fastapi import FastAPI
-from app.api import jobs, resume, tracker
+from app.api import jobs, resume, tracker, health
 from fastapi.middleware.cors import CORSMiddleware
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 
 app = FastAPI(title="ApplyPilot API")
 
@@ -13,6 +20,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(health.router, prefix="/api/v1", tags=["health"])
 app.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
 app.include_router(resume.router, prefix="/resume", tags=["resume"])
 app.include_router(tracker.router, prefix="/tracker", tags=["tracker"])
