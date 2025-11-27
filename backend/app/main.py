@@ -1,6 +1,6 @@
 # backend/app/main.py
 from fastapi import FastAPI
-from app.api import jobs, resume, tracker, health
+from app.api import jobs, resume, tracker, health, applications
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 
@@ -26,6 +26,7 @@ app.add_middleware(
 
 app.include_router(health.router, prefix="/api/v1", tags=["health"])
 app.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
+app.include_router(applications.router, prefix="/api/v1", tags=["applications"])
 app.include_router(resume.router, prefix="/resume", tags=["resume"])
 app.include_router(tracker.router, prefix="/tracker", tags=["tracker"])
 

@@ -5,6 +5,7 @@ from typing import List
 import logging
 from app.core.scraper import scrape_job_text
 from app.core.llm_client import generate_resume_bullets, generate_short_answer, generate_cover_letter
+from app.core.database import save_application, save_generated_content
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -65,6 +66,16 @@ def cover_letter(in_data: CoverLetterIn):
             in_data.company_name, 
             in_data.position_title
         )
+        
+        # Save application if company/position provided
+        if in_data.company_name and in_data.position_title:
+            app_id = save_application(
+                in_data.company_name,
+                in_data.position_title,
+                job_text=in_data.job_text
+            )
+            save_generated_content(app_id, "cover_letter", letter)
+        
         return {"cover_letter": letter}
     except Exception as e:
         logger.error(f"Cover letter generation failed: {str(e)}")
