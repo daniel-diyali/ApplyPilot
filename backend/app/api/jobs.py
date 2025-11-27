@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import List
 import logging
 from app.core.scraper import scrape_job_text
-from app.core.llm_client import generate_resume_bullets, generate_short_answer
+from app.core.llm_client import generate_resume_bullets, generate_short_answer, generate_cover_letter
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -25,6 +25,15 @@ class TailorOut(BaseModel):
     bullets: List[str]
     answer: str
 
+class CoverLetterIn(BaseModel):
+    job_text: str
+    resume_text: str
+    company_name: str = ""
+    position_title: str = ""
+
+class CoverLetterOut(BaseModel):
+    cover_letter: str
+
 @router.post("/scrape", response_model=ScrapeOut)
 def scrape(in_data: ScrapeIn):
     try:
@@ -44,4 +53,19 @@ def tailor(in_data: TailorIn):
         return {"bullets": bullets, "answer": answer}
     except Exception as e:
         logger.error(f"Tailoring failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/cover-letter", response_model=CoverLetterOut)
+def cover_letter(in_data: CoverLetterIn):
+    try:
+        logger.info("Generating cover letter")
+        letter = generate_cover_letter(
+            in_data.job_text, 
+            in_data.resume_text, 
+            in_data.company_name, 
+            in_data.position_title
+        )
+        return {"cover_letter": letter}
+    except Exception as e:
+        logger.error(f"Cover letter generation failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
