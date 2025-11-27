@@ -1,9 +1,10 @@
 # backend/app/api/applications.py
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from typing import List, Optional
 import logging
 from app.core.database import save_application, get_applications, get_application, save_generated_content
+from app.core.validators import validate_url, validate_text_length, sanitize_text
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -14,6 +15,34 @@ class ApplicationIn(BaseModel):
     job_url: str = ""
     job_text: str = ""
     notes: str = ""
+    
+    @validator('company')
+    def validate_company(cls, v):
+        if not v or len(v.strip()) < 2:
+            raise ValueError('Company name is required and must be at least 2 characters')
+        return sanitize_text(v)
+    
+    @validator('position')
+    def validate_position(cls, v):
+        if not v or len(v.strip()) < 2:
+            raise ValueError('Position title is required and must be at least 2 characters')
+        return sanitize_text(v)
+    
+    @validator('job_url')
+    def validate_job_url(cls, v):
+        if v and not validate_url(v):
+            raise ValueError('Invalid URL format')
+        return v
+    
+    @validator('job_text')
+    def validate_job_text(cls, v):
+        if v and not validate_text_length(v, min_length=20):
+            raise ValueError('Job text must be at least 20 characters')
+        return sanitize_text(v)
+    
+    @validator('notes')
+    def validate_notes(cls, v):
+        return sanitize_text(v)
 
 class ApplicationOut(BaseModel):
     id: int

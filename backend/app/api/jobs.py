@@ -1,17 +1,24 @@
 # backend/app/api/jobs.py
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from typing import List
 import logging
 from app.core.scraper import scrape_job_text
 from app.core.llm_client import generate_resume_bullets, generate_short_answer, generate_cover_letter
 from app.core.database import save_application, save_generated_content, get_user_profile
+from app.core.validators import validate_url, validate_text_length, sanitize_text
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 class ScrapeIn(BaseModel):
     url: str
+    
+    @validator('url')
+    def validate_url_format(cls, v):
+        if not validate_url(v):
+            raise ValueError('Invalid URL format')
+        return v
 
 class ScrapeOut(BaseModel):
     job_text: str
@@ -21,6 +28,18 @@ class ScrapeOut(BaseModel):
 class TailorIn(BaseModel):
     job_text: str
     resume_text: str = ""  # Optional, will use profile if empty
+    
+    @validator('job_text')
+    def validate_job_text(cls, v):
+        if v and not validate_text_length(v, min_length=20):
+            raise ValueError('Job text must be at least 20 characters')
+        return sanitize_text(v)
+    
+    @validator('resume_text')
+    def validate_resume_text(cls, v):
+        if v and not validate_text_length(v, min_length=50):
+            raise ValueError('Resume text must be at least 50 characters')
+        return sanitize_text(v)
 
 class TailorOut(BaseModel):
     bullets: List[str]
@@ -31,6 +50,30 @@ class CoverLetterIn(BaseModel):
     resume_text: str = ""  # Optional, will use profile if empty
     company_name: str = ""
     position_title: str = ""
+    
+    @validator('job_text')
+    def validate_job_text(cls, v):
+        if not validate_text_length(v, min_length=20):
+            raise ValueError('Job text must be at least 20 characters')
+        return sanitize_text(v)
+    
+    @validator('resume_text')
+    def validate_resume_text(cls, v):
+        if v and not validate_text_length(v, min_length=50):
+            raise ValueError('Resume text must be at least 50 characters')
+        return sanitize_text(v)
+    
+    @validator('company_name')
+    def validate_company_name(cls, v):
+        if v and len(v.strip()) < 2:
+            raise ValueError('Company name must be at least 2 characters')
+        return sanitize_text(v)
+    
+    @validator('position_title')
+    def validate_position_title(cls, v):
+        if v and len(v.strip()) < 2:
+            raise ValueError('Position title must be at least 2 characters')
+        return sanitize_text(v)
 
 class CoverLetterOut(BaseModel):
     cover_letter: str
