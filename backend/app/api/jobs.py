@@ -5,7 +5,7 @@ from typing import List
 import logging
 from app.core.scraper import scrape_job_text
 from app.core.llm_client import generate_resume_bullets, generate_short_answer, generate_cover_letter
-from app.core.database import save_application, save_generated_content
+from app.core.database import save_application, save_generated_content, get_user_profile
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -20,7 +20,7 @@ class ScrapeOut(BaseModel):
 
 class TailorIn(BaseModel):
     job_text: str
-    resume_text: str
+    resume_text: str = ""  # Optional, will use profile if empty
 
 class TailorOut(BaseModel):
     bullets: List[str]
@@ -28,7 +28,7 @@ class TailorOut(BaseModel):
 
 class CoverLetterIn(BaseModel):
     job_text: str
-    resume_text: str
+    resume_text: str = ""  # Optional, will use profile if empty
     company_name: str = ""
     position_title: str = ""
 
@@ -49,8 +49,18 @@ def scrape(in_data: ScrapeIn):
 def tailor(in_data: TailorIn):
     try:
         logger.info("Generating tailored resume content")
-        bullets = generate_resume_bullets(in_data.job_text, in_data.resume_text)
-        answer = generate_short_answer(in_data.job_text, "Why are you a good fit?", in_data.resume_text)
+        
+        # Use profile resume if not provided
+        resume_text = in_data.resume_text
+        if not resume_text:
+            profile = get_user_profile()
+            if profile and profile.get('resume_text'):
+                resume_text = profile['resume_text']
+            else:
+                raise HTTPException(status_code=400, detail="No resume text provided and no profile found")
+        
+        bullets = generate_resume_bullets(in_data.job_text, resume_text)
+        answer = generate_short_answer(in_data.job_text, "Why are you a good fit?", resume_text)
         return {"bullets": bullets, "answer": answer}
     except Exception as e:
         logger.error(f"Tailoring failed: {str(e)}")
@@ -60,9 +70,19 @@ def tailor(in_data: TailorIn):
 def cover_letter(in_data: CoverLetterIn):
     try:
         logger.info("Generating cover letter")
+        
+        # Use profile resume if not provided
+        resume_text = in_data.resume_text
+        if not resume_text:
+            profile = get_user_profile()
+            if profile and profile.get('resume_text'):
+                resume_text = profile['resume_text']
+            else:
+                raise HTTPException(status_code=400, detail="No resume text provided and no profile found")
+        
         letter = generate_cover_letter(
             in_data.job_text, 
-            in_data.resume_text, 
+            resume_text, 
             in_data.company_name, 
             in_data.position_title
         )

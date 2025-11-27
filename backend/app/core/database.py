@@ -11,6 +11,20 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
+    # User profile table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS user_profile (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            email TEXT,
+            phone TEXT,
+            resume_text TEXT,
+            preferences TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    
     # Applications table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS applications (
@@ -96,6 +110,45 @@ def get_application(app_id: int) -> Optional[Dict]:
     
     conn.close()
     return app
+
+def save_user_profile(name: str = "", email: str = "", phone: str = "", resume_text: str = "", preferences: str = "") -> int:
+    """Save or update user profile"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    # Check if profile exists
+    cursor.execute("SELECT id FROM user_profile LIMIT 1")
+    existing = cursor.fetchone()
+    
+    if existing:
+        cursor.execute("""
+            UPDATE user_profile 
+            SET name=?, email=?, phone=?, resume_text=?, preferences=?, updated_at=CURRENT_TIMESTAMP
+            WHERE id=?
+        """, (name, email, phone, resume_text, preferences, existing[0]))
+        profile_id = existing[0]
+    else:
+        cursor.execute("""
+            INSERT INTO user_profile (name, email, phone, resume_text, preferences)
+            VALUES (?, ?, ?, ?, ?)
+        """, (name, email, phone, resume_text, preferences))
+        profile_id = cursor.lastrowid
+    
+    conn.commit()
+    conn.close()
+    return profile_id
+
+def get_user_profile() -> Optional[Dict]:
+    """Get user profile"""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT * FROM user_profile LIMIT 1")
+    profile = cursor.fetchone()
+    
+    conn.close()
+    return dict(profile) if profile else None
 
 # Initialize database on import
 init_db()
