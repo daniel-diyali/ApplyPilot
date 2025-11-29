@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, validator
 from typing import List, Optional
 import logging
-from app.core.database import save_application, get_applications, get_application, save_generated_content
+from app.core.database import save_application, get_applications, get_application, save_generated_content, update_application_status, get_applications_by_status, get_application_stats
 from app.core.validators import validate_url, validate_text_length, sanitize_text
 
 logger = logging.getLogger(__name__)
@@ -54,6 +54,21 @@ class ApplicationOut(BaseModel):
     applied_date: str
     notes: str
 
+class StatusUpdateIn(BaseModel):
+    status: str
+    notes: str = ""
+    
+    @validator('status')
+    def validate_status(cls, v):
+        valid_statuses = ['applied', 'reviewing', 'phone_screen', 'interview', 'final_round', 'offer', 'rejected', 'withdrawn']
+        if v not in valid_statuses:
+            raise ValueError(f"Invalid status. Must be one of: {', '.join(valid_statuses)}")
+        return v
+    
+    @validator('notes')
+    def validate_notes(cls, v):
+        return sanitize_text(v)
+
 @router.post("/applications", response_model=dict)
 def create_application(app_data: ApplicationIn):
     try:
@@ -88,4 +103,36 @@ def get_application_detail(app_id: int):
         return app
     except Exception as e:
         logger.error(f"Failed to get application {app_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.put("/applications/{app_id}/status")
+def update_status(app_id: int, status_data: StatusUpdateIn):
+    try:
+        logger.info(f"Updating application {app_id} status to {status_data.status}")
+        updated = update_application_status(app_id, status_data.status, status_data.notes)
+        if not updated:
+            raise HTTPException(status_code=404, detail="Application not found")
+        return {"message": "Status updated successfully"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Failed to update status for application {app_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/applications/status/{status}")
+def get_applications_by_status_endpoint(status: str):
+    try:
+        apps = get_applications_by_status(status)
+        return apps
+    except Exception as e:
+        logger.error(f"Failed to get applications by status {status}: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/applications/stats")
+def get_stats():
+    try:
+        stats = get_application_stats()
+        return stats
+    except Exception as e:
+        logger.error(f"Failed to get application stats: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

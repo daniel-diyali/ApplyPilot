@@ -150,5 +150,61 @@ def get_user_profile() -> Optional[Dict]:
     conn.close()
     return dict(profile) if profile else None
 
+def update_application_status(app_id: int, status: str, notes: str = "") -> bool:
+    """Update application status"""
+    valid_statuses = ['applied', 'reviewing', 'phone_screen', 'interview', 'final_round', 'offer', 'rejected', 'withdrawn']
+    
+    if status not in valid_statuses:
+        raise ValueError(f"Invalid status. Must be one of: {', '.join(valid_statuses)}")
+    
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute(
+        "UPDATE applications SET status = ?, notes = ? WHERE id = ?",
+        (status, notes, app_id)
+    )
+    
+    updated = cursor.rowcount > 0
+    conn.commit()
+    conn.close()
+    return updated
+
+def get_applications_by_status(status: str = None) -> List[Dict]:
+    """Get applications filtered by status"""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    if status:
+        cursor.execute("SELECT * FROM applications WHERE status = ? ORDER BY applied_date DESC", (status,))
+    else:
+        cursor.execute("SELECT * FROM applications ORDER BY applied_date DESC")
+    
+    apps = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return apps
+
+def get_application_stats() -> Dict:
+    """Get application statistics"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT COUNT(*) FROM applications")
+    total = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT status, COUNT(*) FROM applications GROUP BY status")
+    status_counts = dict(cursor.fetchall())
+    
+    cursor.execute("SELECT COUNT(*) FROM applications WHERE applied_date >= date('now', '-30 days')")
+    recent = cursor.fetchone()[0]
+    
+    conn.close()
+    return {
+        "total_applications": total,
+        "status_breakdown": status_counts,
+        "recent_applications": recent
+    }
+
 # Initialize database on import
 init_db()
